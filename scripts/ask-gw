@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Run `ask` with the model routed through Vercel AI Gateway (native Anthropic
+# Messages API). Needs AI_GATEWAY_API_KEY in the environment.
+#
+#   AI_GATEWAY_API_KEY=vck_... ./scripts/ask-gw aws "list my buckets"
+#
+# Model defaults to a gateway-prefixed Anthropic id; override with ASK_GW_MODEL.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+: "${AI_GATEWAY_API_KEY:?set AI_GATEWAY_API_KEY (Vercel AI Gateway key)}"
+
+MODEL="${ASK_GW_MODEL:-anthropic/claude-sonnet-4.6}"
+
+# Empty so it never shadows the gateway bearer token (API key > AUTH_TOKEN).
+export ANTHROPIC_API_KEY=""
+export ANTHROPIC_AUTH_TOKEN="$AI_GATEWAY_API_KEY"
+
+[ -x ./ask ] || GOTOOLCHAIN=auto go build -o ask ./cmd/ant
+
+exec ./ask \
+  --base-url https://ai-gateway.vercel.sh \
+  --model "$MODEL" \
+  "$@"
