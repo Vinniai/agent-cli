@@ -72,8 +72,9 @@ func defaultCommandRunner(ctx context.Context, name string, args []string, env [
 	return string(out), err
 }
 
-// defaultModel is the model used by the assistant agent loop.
-const defaultModel = "claude-sonnet-4-6"
+// defaultModel is the model used by the assistant agent loop. Haiku is fast and
+// cheap for command translation; override per call with --model.
+const defaultModel = "claude-haiku-4-5-20251001"
 
 // runToolName is the name of the single tool exposed to the model.
 const runToolName = "run_command"

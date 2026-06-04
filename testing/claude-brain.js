@@ -86,6 +86,7 @@ http.createServer((req, res) => {
     let j = {};
     try { j = JSON.parse(body); } catch (_) {}
     const system = (Array.isArray(j.system) ? j.system.map((s) => s.text).join("\n") : j.system) || "";
+    console.error(`[claude-brain] requested model=${j.model || "(none)"} -> claude -p --model ${cliModel(j.model)}`);
     res.setHeader("content-type", "application/json");
     let decision;
     try {
