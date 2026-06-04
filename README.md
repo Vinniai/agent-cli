@@ -87,6 +87,17 @@ model per call with `--model` (default `claude-sonnet-4-6`).
    (including `aws`/`gh`). Manage logins with `./ask auth status` /
    `./ask auth logout`; select a named login with the global `--profile` flag.
 
+   Already logged into **Claude Code** on this machine (macOS)? Reuse that
+   keychain login instead of a separate `ask auth login`:
+
+   ```sh
+   make claude-auth        # syncs the Claude Code OAuth token into an ask profile
+   ./ask aws "list my S3 buckets"
+   ```
+
+   Re-run `make claude-auth` if the token expires. Note: inference goes against
+   your Claude subscription, so its rate limits apply (shared with Claude Code).
+
 2. **API key / auth token** — set one of these (or the matching flag):
 
    | Environment variable   | Notes            |

@@ -10,13 +10,16 @@ AWS_EMU_ENV := AWS_ENDPOINT_URL=http://localhost:4006 AWS_ACCESS_KEY_ID=test AWS
 
 PROMPT ?= list my s3 buckets
 
-.PHONY: help build fmt vet test test-all servers-up servers-down demo-aws demo-gh repl-aws
+.PHONY: help build fmt vet test test-all servers-up servers-down demo-aws demo-gh repl-aws claude-auth
 
 help: ## list targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 build: ## build ./ask
 	$(GO) build -o ask ./cmd/ant
+
+claude-auth: ## reuse the device's Claude Code OAuth (macOS keychain) as ask's login
+	$(GO) run ./testing/claudecode-auth
 
 fmt: ## gofmt the provider files
 	gofmt -w pkg/cmd/provider*.go

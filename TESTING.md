@@ -81,6 +81,20 @@ Precedence: `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` > explicit `--profile` 
 active logged-in profile. The OAuth path sends `Authorization: Bearer <token>`
 plus `anthropic-beta: oauth-2025-04-20` on every model call.
 
+**Reuse the device's Claude Code login (macOS keychain), no second login:**
+
+```sh
+make claude-auth          # = go run ./testing/claudecode-auth
+./ask aws "list my buckets"
+```
+
+`testing/claudecode-auth` reads the `Claude Code-credentials` keychain item
+(falls back to `~/.claude/.credentials.json`) and writes its OAuth token into an
+active `ask` `user_oauth` profile named `claude-code`. Re-run it when the token
+expires (Claude Code keeps the keychain copy fresh as you use it). Inference
+counts against your Claude subscription, so subscription rate limits apply
+(a `429` means authenticated-but-throttled, not an auth failure).
+
 **Offline wiring check (no real login):** `testing/mkprofile` writes a fake
 `user_oauth` profile so you can confirm the OAuth credential reaches the model
 call without a browser:
