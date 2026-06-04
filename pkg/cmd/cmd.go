@@ -433,6 +433,16 @@ Per-command help: 'ask aws --help', 'ask gh --help', 'ask auth --help'.`,
 			},
 		},
 	}
+
+	// ask is a natural-language frontend; the generated raw-API commands stay
+	// available for scripting (see README "Direct API access") but are hidden
+	// from help so the listing leads with the assistants (aws/gh) and auth.
+	for _, c := range Command.Commands {
+		switch c.Category {
+		case "API RESOURCE", "SELF-HOSTED":
+			c.Hidden = true
+		}
+	}
 }
 
 func generateManpages(ctx context.Context, c *cli.Command) error {

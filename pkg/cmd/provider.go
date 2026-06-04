@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -267,6 +268,9 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		}
 		resp, err := a.message(ctx, params)
 		if err != nil {
+			if hint := authHint(err); hint != "" {
+				fmt.Fprint(a.stderr, hint)
+			}
 			return err
 		}
 
@@ -306,6 +310,33 @@ func defaultMessageFunc(client anthropic.Client) messageFunc {
 	return func(ctx context.Context, params anthropic.MessageNewParams) (*anthropic.Message, error) {
 		return client.Messages.New(ctx, params)
 	}
+}
+
+// authHint returns actionable guidance for model-endpoint auth failures (401/403)
+// and rate limits (429), or "" for unrelated errors. The model call — not the
+// backing CLI — is what authenticates against the Anthropic API, so these point
+// at ask's auth, not aws/gh creds.
+func authHint(err error) string {
+	var apiErr *anthropic.Error
+	if !errors.As(err, &apiErr) {
+		return ""
+	}
+	const ways = `
+How to authenticate the model:
+   ask auth login                          # log in with your Claude account (OAuth)
+   export ANTHROPIC_API_KEY=sk-ant-...     # use an API key (separate limits/billing)
+   ask --base-url https://ai-gateway.vercel.sh --auth-token "$AI_GATEWAY_API_KEY" ...
+                                           # route via an LLM gateway (Bearer token)
+   ask auth status                         # show the credential currently in use
+`
+	switch apiErr.StatusCode {
+	case 429:
+		return "\nRate limited (HTTP 429): authenticated, but over your limit. Wait and retry,\n" +
+			"or switch to a credential with separate limits (API key or a gateway).\n" + ways
+	case 401, 403:
+		return fmt.Sprintf("\nNot authenticated to the model endpoint (HTTP %d). Log in or set a key.\n%s", apiErr.StatusCode, ways)
+	}
+	return ""
 }
 
 // newProviderCommand builds the cli.Command for a provider.
