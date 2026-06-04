@@ -45,6 +45,21 @@ export ANTHROPIC_API_KEY=sk-ant-...      # the model that does the translation
 
 Run a provider with no prompt to drop into an interactive REPL: `./ask aws`.
 
+**Quote your prompt** when it contains characters your shell treats specially
+(`?`, `'`, `|`, `*`). Plain words work unquoted (`ask aws list my buckets`), but
+`ask aws how many buckets?` makes the shell try to glob `buckets?` — so quoting
+is the safe habit.
+
+### Built-in help
+
+Every entry point prints usage with copy-pasteable examples:
+
+```sh
+ask                 # or: ask help | ask --help | ask -h  — overview + examples
+ask aws --help      # provider flags (--model --profile --all-profiles --yes/-y)
+ask auth --help     # authentication commands
+```
+
 See [TESTING.md](./TESTING.md) for the full test/usage guide, including a local
 emulator sandbox you can exercise without real cloud credentials.
 

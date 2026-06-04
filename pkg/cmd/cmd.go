@@ -27,6 +27,21 @@ func init() {
 	Command = &cli.Command{
 		Name:      "ask",
 		Usage:     "Natural-language frontend for backing CLIs",
+		Description: `Describe what you want in plain English; ask translates it into the right CLI
+command, runs it, and answers. Read-only commands run immediately; writes print
+the exact command and ask for confirmation (pass --yes to skip the gate).
+
+Quote prompts that contain punctuation (?, ', |, *) so your shell doesn't eat it:
+
+   ask aws "list my S3 buckets in us-east-1"
+   ask aws --profile prod "how many running EC2 instances?"
+   ask aws "list buckets in prod"          # target account inferred from the question
+   ask aws --all-profiles "total bucket count across all accounts"
+   ask gh  "list my open pull requests"
+   ask aws                                 # no prompt -> interactive REPL
+
+Auth: set ANTHROPIC_API_KEY or run 'ask auth login'; pick a model with --model.
+Per-command help: 'ask aws --help', 'ask gh --help', 'ask auth --help'.`,
 		Suggest:   true,
 		Version:   Version,
 		ErrWriter: &CommandErrorBuffer,
@@ -417,7 +432,6 @@ func init() {
 				Action:          autocomplete.OutputCompletionScript,
 			},
 		},
-		HideHelpCommand: true,
 	}
 }
 
