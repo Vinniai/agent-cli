@@ -38,6 +38,9 @@ http.createServer((req, res) => {
     let j = {};
     try { j = JSON.parse(body); } catch (_) {}
     const convo = JSON.stringify(j.messages || []);
+    // Log how the caller authenticated (helps verify api-key vs OAuth wiring).
+    const auth = req.headers["authorization"] || (req.headers["x-api-key"] ? "x-api-key " + String(req.headers["x-api-key"]).slice(0, 12) + "…" : "(none)");
+    console.error(`[auth] authorization=${auth} anthropic-beta=${req.headers["anthropic-beta"] || "(none)"}`);
     res.setHeader("content-type", "application/json");
     if (convo.includes("tool_result")) {
       res.end(message(j.model, [{ type: "text", text: "Done — see the command output above (summarized by mock)." }], "end_turn"));

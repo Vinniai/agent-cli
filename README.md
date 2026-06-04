@@ -73,14 +73,30 @@ line to the `Commands` list in `pkg/cmd/cmd.go`. Use `provider_aws.go` /
 
 `ask` needs credentials for the model (the brain) and for each CLI it drives.
 
-**Model (Anthropic API)** — set one of these, or run `./ask auth login` to store
-a profile. Choose the model per call with `--model` (default
-`claude-sonnet-4-6`).
+**Model (the brain)** — authenticate the model in one of two ways. Choose the
+model per call with `--model` (default `claude-sonnet-4-6`).
 
-| Environment variable   | Required        | Default |
-| ---------------------- | --------------- | ------- |
-| `ANTHROPIC_API_KEY`    | one of these    | `null`  |
-| `ANTHROPIC_AUTH_TOKEN` |                 | `null`  |
+1. **OAuth (log in with your Claude account)** — no API key needed:
+
+   ```sh
+   ./ask auth login          # opens a browser; grants the user:inference scope
+   ./ask aws "list my S3 buckets"
+   ```
+
+   The token is stored as a profile, auto-refreshed, and used by every command
+   (including `aws`/`gh`). Manage logins with `./ask auth status` /
+   `./ask auth logout`; select a named login with the global `--profile` flag.
+
+2. **API key / auth token** — set one of these (or the matching flag):
+
+   | Environment variable   | Notes            |
+   | ---------------------- | ---------------- |
+   | `ANTHROPIC_API_KEY`    | standard API key |
+   | `ANTHROPIC_AUTH_TOKEN` | bearer token     |
+
+> Precedence: `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` (env or flag) win over
+> a logged-in profile. To use OAuth, make sure those aren't set (`unset
+> ANTHROPIC_API_KEY`). `./ask auth status` shows which credential is active.
 
 **CLI tools** — configure each as normal: `aws configure` / `aws sso login`, and
 `gh auth login`.

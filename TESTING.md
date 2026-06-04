@@ -61,6 +61,39 @@ aws configure                            # or: aws sso login --profile prod
 ./ask gh "show issues assigned to me in the acme org"
 ```
 
+### Authenticating the model: OAuth vs API key
+`ask` shares one credential chain across all commands, so the providers work
+with either:
+
+```sh
+# OAuth — log in with your Claude account (no API key)
+./ask auth login            # browser/PKCE; grants user:inference scope
+unset ANTHROPIC_API_KEY      # env key would otherwise take precedence
+./ask aws "list my buckets"  # uses the stored OAuth token (auto-refreshed)
+./ask auth status            # shows the active credential
+
+# API key
+export ANTHROPIC_API_KEY=sk-ant-...
+./ask aws "list my buckets"
+```
+
+Precedence: `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` > explicit `--profile` >
+active logged-in profile. The OAuth path sends `Authorization: Bearer <token>`
+plus `anthropic-beta: oauth-2025-04-20` on every model call.
+
+**Offline wiring check (no real login):** `testing/mkprofile` writes a fake
+`user_oauth` profile so you can confirm the OAuth credential reaches the model
+call without a browser:
+
+```sh
+go run ./testing/mkprofile /tmp/askoauth          # fake non-expiring profile
+node testing/anthropic-mock.js >/tmp/mock.log 2>&1 &   # logs auth headers
+ANTHROPIC_CONFIG_DIR=/tmp/askoauth AWS_ENDPOINT_URL=http://localhost:4006 \
+  AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
+  ./ask --base-url http://localhost:4009 aws --yes "list my buckets"
+grep '\[auth\]' /tmp/mock.log    # -> Bearer <token> ... anthropic-beta=oauth-2025-04-20
+```
+
 ### Account selection (three ways)
 1. **Pin one:** `--profile prod` (authoritative; the model can't override it).
 2. **All accounts:** `--all-profiles` (fans out across every profile in `~/.aws/config`).
