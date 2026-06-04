@@ -310,16 +310,26 @@ func defaultMessageFunc(client anthropic.Client) messageFunc {
 
 // newProviderCommand builds the cli.Command for a provider.
 func newProviderCommand(p Provider) cli.Command {
+	name := p.Name()
 	return cli.Command{
-		Name:      p.Name(),
+		Name:      name,
 		Category:  "ASSISTANT",
-		Usage:     fmt.Sprintf("Natural-language frontend for the %s CLI", p.Name()),
+		Usage:     fmt.Sprintf("Natural-language frontend for the %s CLI", name),
 		ArgsUsage: "[prompt]",
+		Description: fmt.Sprintf(`Ask the %s CLI in plain English. Read commands run immediately; writes print the
+command and wait for y/N (use --yes to skip). With no prompt, opens a REPL.
+The executed command and its output go to stderr; the final answer to stdout.
+
+   ask %s "list my ..."
+   ask %s --profile NAME "..."     # pin one account/host (overrides inference)
+   ask %s --all-profiles "..."     # fan out across every account/host
+   ask %s "... in prod"            # account inferred from the wording`,
+			name, name, name, name, name),
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "model", Value: defaultModel},
-			&cli.StringFlag{Name: "profile"},
-			&cli.BoolFlag{Name: "all-profiles"},
-			&cli.BoolFlag{Name: "yes"},
+			&cli.StringFlag{Name: "model", Value: defaultModel, Usage: "Model that performs the translation"},
+			&cli.StringFlag{Name: "profile", Usage: "Pin one account/profile (authoritative; overrides any inferred target)"},
+			&cli.BoolFlag{Name: "all-profiles", Usage: "Fan the question out across every profile/host"},
+			&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Skip the write-confirmation gate (run writes without asking)"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			client := anthropic.NewClient(getDefaultRequestOptions(cmd.Root())...)

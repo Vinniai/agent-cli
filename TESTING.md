@@ -36,8 +36,8 @@ Full suite (includes the generated API tests, which need the Stainless mock on
 
 ```bash
 make build           # -> ./ask
-./ask --help         # 'ask'; aws + gh under ASSISTANT
-./ask aws --help     # flags: --model --profile --all-profiles --yes
+./ask --help         # overview + examples (same as: ask | ask help | ask -h)
+./ask aws --help     # provider help + flags: --model --profile --all-profiles --yes/-y
 ```
 
 ---
