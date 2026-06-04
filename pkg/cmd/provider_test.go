@@ -401,3 +401,36 @@ func TestAgentLoopFanOut(t *testing.T) {
 		t.Fatalf("expected calls with --profile a and --profile b; got %v", runner.calls)
 	}
 }
+
+// --- auth/rate-limit guidance ------------------------------------------------
+
+func TestAuthHint(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		expect string // substring expected, or "" for no hint
+	}{
+		{"rate limit 429", &anthropic.Error{StatusCode: 429}, "Rate limited"},
+		{"unauthorized 401", &anthropic.Error{StatusCode: 401}, "Not authenticated"},
+		{"forbidden 403", &anthropic.Error{StatusCode: 403}, "Not authenticated"},
+		{"other api error", &anthropic.Error{StatusCode: 400}, ""},
+		{"non-api error", context.Canceled, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := authHint(c.err)
+			if c.expect == "" {
+				if got != "" {
+					t.Fatalf("expected no hint, got: %q", got)
+				}
+				return
+			}
+			if !strings.Contains(got, c.expect) {
+				t.Fatalf("hint missing %q; got: %q", c.expect, got)
+			}
+			if !strings.Contains(got, "ask auth login") || !strings.Contains(got, "ANTHROPIC_API_KEY") {
+				t.Fatalf("hint should list login methods; got: %q", got)
+			}
+		})
+	}
+}

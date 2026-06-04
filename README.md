@@ -115,10 +115,22 @@ model per call with `--model` (default `claude-sonnet-4-6`).
 
 2. **API key / auth token** — set one of these (or the matching flag):
 
-   | Environment variable   | Notes            |
-   | ---------------------- | ---------------- |
-   | `ANTHROPIC_API_KEY`    | standard API key |
-   | `ANTHROPIC_AUTH_TOKEN` | bearer token     |
+   | Environment variable   | Notes                                            |
+   | ---------------------- | ------------------------------------------------ |
+   | `ANTHROPIC_API_KEY`    | standard API key (own limits/billing)            |
+   | `ANTHROPIC_AUTH_TOKEN` | bearer token — e.g. an LLM gateway (Vercel etc.) |
+
+   To route the model through a gateway, pair `ANTHROPIC_AUTH_TOKEN` with
+   `--base-url`, e.g. Vercel AI Gateway's native Messages API:
+
+   ```sh
+   ./ask --base-url https://ai-gateway.vercel.sh --auth-token "$AI_GATEWAY_API_KEY" \
+     --model anthropic/claude-sonnet-4.6 aws "list my buckets"
+   ```
+
+   If a model call returns **HTTP 429 (rate_limit_error)** you're authenticated
+   but over your limit — `ask` prints these same login options; wait and retry,
+   or switch to a credential with separate limits (an API key or a gateway).
 
 > Precedence: `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` (env or flag) win over
 > a logged-in profile. To use OAuth, make sure those aren't set (`unset
@@ -129,7 +141,9 @@ model per call with `--model` (default `claude-sonnet-4-6`).
 
 ## Direct API access
 
-`ask` retains the full Anthropic API command surface for scripting:
+`ask` retains the full Anthropic API command surface for scripting. These raw
+commands (`messages`, `models`, `beta:*`, …) are **hidden from `ask --help`** to
+keep the listing focused on the assistants, but they remain fully available:
 
 ```sh
 ./ask messages create \
