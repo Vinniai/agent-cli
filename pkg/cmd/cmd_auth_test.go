@@ -39,7 +39,7 @@ func TestWriteCallbackPageEscapesHTML(t *testing.T) {
 	assert.Contains(t, body, "&lt;img src=x onerror=alert(1)&gt;")
 }
 
-// TestLoginMode covers the three-way flag dispatch for `ant auth login`:
+// TestLoginMode covers the three-way flag dispatch for `ask auth login`:
 // default (browser + loopback), SSH-forward (--no-browser + fixed port),
 // and headless (--no-browser alone, copy-paste via stdin).
 func TestLoginMode(t *testing.T) {
@@ -412,7 +412,7 @@ func TestMultiAuthWarning(t *testing.T) {
 		assert.Contains(t, out, "--api-key / ANTHROPIC_API_KEY")
 		assert.Contains(t, out, "profile from --profile / ANTHROPIC_PROFILE")
 		assert.Contains(t, out, "using --api-key / ANTHROPIC_API_KEY per precedence")
-		assert.Contains(t, out, "ant auth status")
+		assert.Contains(t, out, "ask auth status")
 	})
 
 	t.Run("federation beats implicit profile", func(t *testing.T) {
@@ -599,7 +599,7 @@ func TestLoadProfileFillsClientIDDefault(t *testing.T) {
 		require.NotNil(t, cfg)
 		assert.Equal(t, oauthClientIDProd, cfg.AuthenticationInfo.UserOAuth.ClientID)
 		assert.Contains(t, out, "missing client_id")
-		assert.Contains(t, out, "ant auth login")
+		assert.Contains(t, out, "ask auth login")
 		// Second call: still defaults, but no second warning.
 		out2 := captureStderr(t, func() { _, _ = loadProfileIfUsable(nil) })
 		assert.Empty(t, out2)
@@ -1188,9 +1188,9 @@ func TestAuthLoginNotesStoredOrgSource(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "from profile")
 		assert.Contains(t, stderr, "org-A")
-		assert.Contains(t, stderr, "ant auth login --profile",
+		assert.Contains(t, stderr, "ask auth login --profile",
 			"hint should point at the name-based picker path (a fresh profile)")
-		assert.Contains(t, stderr, "ant profile set organization_id",
+		assert.Contains(t, stderr, "ask profile set organization_id",
 			"hint should point at retargeting the existing profile")
 	})
 
@@ -1517,7 +1517,7 @@ func TestAuthLoginBootstrapOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Contains(t, out, "→ Token bound to workspace \"Hint Workspace\" (wrkspc_hint)")
-		assert.Contains(t, out, "ant profile set workspace_id wrkspc_hint --profile nows")
+		assert.Contains(t, out, "ask profile set workspace_id wrkspc_hint --profile nows")
 		assert.Equal(t, string(before), string(mustRead(t, config.ProfilePath(dir, "nows"))),
 			"re-login must not rewrite configs/<profile>.json")
 	})
@@ -1541,8 +1541,8 @@ func TestAuthLoginBootstrapOnly(t *testing.T) {
 
 		assert.Contains(t, out, "⚠ Token bound to workspace \"New Workspace\" (wrkspc_NEW)")
 		assert.Contains(t, out, "but profile \"mismatch\" targets wrkspc_OLD")
-		assert.Contains(t, out, "ant profile set workspace_id wrkspc_NEW --profile mismatch")
-		assert.Contains(t, out, "ant auth login --profile <new> --workspace-id wrkspc_NEW")
+		assert.Contains(t, out, "ask profile set workspace_id wrkspc_NEW --profile mismatch")
+		assert.Contains(t, out, "ask auth login --profile <new> --workspace-id wrkspc_NEW")
 		assert.Equal(t, string(before), string(mustRead(t, config.ProfilePath(dir, "mismatch"))),
 			"re-login must not rewrite configs/<profile>.json (warn-only, no retarget)")
 	})
@@ -1716,7 +1716,7 @@ func runStatus(t *testing.T) (string, error) {
 }
 
 // TestAuthStatusProfileNotConfigured covers a fresh config dir with no
-// configs/<profile>.json at all (typical first run before `ant auth login`).
+// configs/<profile>.json at all (typical first run before `ask auth login`).
 // Status should succeed and surface an actionable hint, distinct from the
 // "config present, credentials missing" state.
 func TestAuthStatusProfileNotConfigured(t *testing.T) {
@@ -1728,7 +1728,7 @@ func TestAuthStatusProfileNotConfigured(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "Active profile:  default")
 	assert.Contains(t, out, `profile "default" not configured`)
-	assert.Contains(t, out, "ant auth login")
+	assert.Contains(t, out, "ask auth login")
 }
 
 // TestAuthStatusCredentialsMissing covers a profile config that exists on
@@ -1749,7 +1749,7 @@ func TestAuthStatusCredentialsMissing(t *testing.T) {
 	out, err := runStatus(t)
 	require.NoError(t, err)
 	assert.Contains(t, out, "Active profile:  default")
-	assert.Contains(t, out, "configured but not logged in — run `ant auth login`")
+	assert.Contains(t, out, "configured but not logged in — run `ask auth login`")
 }
 
 // TestAuthStatusExpiredToken covers a profile whose stored access_token has

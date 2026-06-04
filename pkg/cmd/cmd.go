@@ -25,8 +25,8 @@ var (
 
 func init() {
 	Command = &cli.Command{
-		Name:      "ant",
-		Usage:     "CLI for the Claude Developer Platform",
+		Name:      "ask",
+		Usage:     "Natural-language frontend for backing CLIs",
 		Suggest:   true,
 		Version:   Version,
 		ErrWriter: &CommandErrorBuffer,
@@ -374,10 +374,12 @@ func init() {
 				},
 			},
 			&workerCommand,
+			&askAWSCommand,
+			&askGHCommand,
 			{
 				Name:            "@manpages",
 				Usage:           "Generate documentation for 'man'",
-				UsageText:       "ant @manpages [-o ant.1] [--gzip]",
+				UsageText:       "ask @manpages [-o ask.1] [--gzip]",
 				Hidden:          true,
 				Action:          generateManpages,
 				HideHelpCommand: true,
@@ -430,7 +432,7 @@ func generateManpages(ctx context.Context, c *cli.Command) error {
 		// handle error
 	}
 	if c.Bool("text") {
-		file, err := os.Create(filepath.Join(dir, "man1", "ant.1"))
+		file, err := os.Create(filepath.Join(dir, "man1", "ask.1"))
 		if err != nil {
 			return err
 		}
@@ -440,7 +442,7 @@ func generateManpages(ctx context.Context, c *cli.Command) error {
 		}
 	}
 	if c.Bool("gzip") {
-		file, err := os.Create(filepath.Join(dir, "man1", "ant.1.gz"))
+		file, err := os.Create(filepath.Join(dir, "man1", "ask.1.gz"))
 		if err != nil {
 			return err
 		}

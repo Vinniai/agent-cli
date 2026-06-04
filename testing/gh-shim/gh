@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+// Emulator test shim for `gh`: forwards `gh api <path>` (REST) to the
+// agent-emulate GitHub emulator on http://localhost:4001. Lets `ask gh` run
+// against the emulator without the real gh's HTTPS/keychain-trust requirement.
+// Put this dir first on PATH only for emulator testing. NOT the real gh binary.
+const http = require("http");
+const argv = process.argv.slice(2);
+const PORT = process.env.GH_EMU_PORT || 4001;
+const TOKEN = process.env.GH_ENTERPRISE_TOKEN || process.env.GH_TOKEN || "test_token_admin";
+
+if (argv[0] !== "api") {
+  console.error("emulator-shim: only `gh api` is supported here, got: gh " + argv.join(" "));
+  process.exit(2);
+}
+
+let method = "GET", path = "", explicit = false;
+const fields = {};
+for (let i = 1; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === "-X" || a === "--method") { method = (argv[++i] || "GET").toUpperCase(); explicit = true; }
+  else if (a.startsWith("--method=")) { method = a.slice(9).toUpperCase(); explicit = true; }
+  else if (a === "-f" || a === "--raw-field" || a === "--field" || a === "-F") {
+    const kv = argv[++i] || ""; const idx = kv.indexOf("=");
+    fields[kv.slice(0, idx)] = kv.slice(idx + 1);
+    if (!explicit) method = "POST";
+  } else if (a === "-H" || a === "--header") { i++; }
+  else if (a.startsWith("-")) { /* ignore */ }
+  else { path = a; }
+}
+if (!path.startsWith("/")) path = "/" + path;
+
+const body = Object.keys(fields).length ? JSON.stringify(fields) : null;
+const headers = { Authorization: "Bearer " + TOKEN, "Content-Type": "application/json", Accept: "application/vnd.github+json" };
+if (body) headers["Content-Length"] = Buffer.byteLength(body);
+
+const req = http.request({ host: "127.0.0.1", port: PORT, method, path, headers }, (res) => {
+  let d = "";
+  res.on("data", (c) => (d += c));
+  res.on("end", () => { process.stdout.write(d); process.exit(res.statusCode >= 400 ? 1 : 0); });
+});
+req.on("error", (e) => { console.error(String(e)); process.exit(1); });
+if (body) req.write(body);
+req.end();

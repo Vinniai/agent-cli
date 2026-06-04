@@ -47,12 +47,12 @@ func init() {
 
 func profileActivate(ctx context.Context, c *cli.Command) error {
 	if c.Args().Len() != 1 {
-		return fmt.Errorf("usage: ant profile activate <name>")
+		return fmt.Errorf("usage: ask profile activate <name>")
 	}
 	name := c.Args().First()
 	dir := config.DefaultDir()
 	if _, err := os.Stat(config.ProfilePath(dir, name)); err != nil {
-		return fmt.Errorf("profile %q doesn't exist. Run `ant auth login --profile %s` to create it", name, name)
+		return fmt.Errorf("profile %q doesn't exist. Run `ask auth login --profile %s` to create it", name, name)
 	}
 	if err := config.SetActiveProfile(dir, name); err != nil {
 		return err
@@ -69,7 +69,7 @@ func profileList(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 	if len(names) == 0 {
-		fmt.Fprintln(os.Stderr, "(no profiles — run `ant auth login`)")
+		fmt.Fprintln(os.Stderr, "(no profiles — run `ask auth login`)")
 		return nil
 	}
 	for _, name := range names {
@@ -156,7 +156,7 @@ func profileGet(ctx context.Context, c *cli.Command) error {
 
 func profileSet(ctx context.Context, c *cli.Command) error {
 	if c.Args().Len() != 2 {
-		return fmt.Errorf("usage: ant profile set <key> <value>")
+		return fmt.Errorf("usage: ask profile set <key> <value>")
 	}
 	key, value := c.Args().Get(0), c.Args().Get(1)
 	profile, dir := activeProfile(c)
@@ -186,7 +186,7 @@ func profileSet(ctx context.Context, c *cli.Command) error {
 		cfg.OrganizationID = value
 	case "scope", "client_id", "console_url":
 		if cfg.AuthenticationInfo == nil || cfg.AuthenticationInfo.Type != config.AuthenticationTypeUserOAuth || cfg.AuthenticationInfo.UserOAuth == nil {
-			return fmt.Errorf("%s can only be set on user_oauth profiles (run `ant auth login` first)", key)
+			return fmt.Errorf("%s can only be set on user_oauth profiles (run `ask auth login` first)", key)
 		}
 		switch key {
 		case "scope":
@@ -206,7 +206,7 @@ func profileSet(ctx context.Context, c *cli.Command) error {
 	if clearedWorkspace {
 		fmt.Fprintf(os.Stderr,
 			"  Cleared workspace_id — it was scoped to the previous organization. "+
-				"Set one for the new org with: ant profile set workspace_id <id>\n")
+				"Set one for the new org with: ask profile set workspace_id <id>\n")
 	}
 	return nil
 }

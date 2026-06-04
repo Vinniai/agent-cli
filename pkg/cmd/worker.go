@@ -99,7 +99,7 @@ func handleWorkerPoll(ctx context.Context, cmd *cli.Command) error {
 
 	// With an --on-work script, use the control-plane-only WorkPoller and exec
 	// the script for each claimed item; the script (typically launching a
-	// container that runs `ant beta:worker run`) is responsible for servicing
+	// container that runs `ask beta:worker run`) is responsible for servicing
 	// the session and heartbeating the lease.
 	poller := environments.NewWorkPoller(ctx, client, environments.WorkPollerOptions{
 		EnvironmentID:  cmd.String("environment-id"),
@@ -196,7 +196,7 @@ func newOnWorkRunner(cmd *cli.Command, logger *slog.Logger) func(context.Context
 			"ANTHROPIC_ENVIRONMENT_KEY="+environmentKey,
 		)
 		// Fold child stdout into our stderr so a stderr-based log consumer sees
-		// one unified stream. `ant beta:worker poll` produces no stdout itself, so
+		// one unified stream. `ask beta:worker poll` produces no stdout itself, so
 		// we're not stepping on a pipeable output channel.
 		c.Stdout = os.Stderr
 		c.Stderr = os.Stderr

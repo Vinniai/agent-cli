@@ -40,7 +40,7 @@ const (
 )
 
 // tokenResponse mirrors the /v1/oauth/token response for the interactive
-// authorization_code grant driven by `ant auth login`.
+// authorization_code grant driven by `ask auth login`.
 type tokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -118,7 +118,7 @@ func init() {
 					},
 					&cli.StringFlag{
 						Name:    "client-id",
-						Usage:   "OAuth client_id (overrides the profile's stored value; defaults to the ant-cli prod client)",
+						Usage:   "OAuth client_id (overrides the profile's stored value; defaults to the ask-cli prod client)",
 						Sources: cli.EnvVars("ANTHROPIC_OAUTH_CLIENT_ID"),
 					},
 					&cli.StringFlag{
@@ -161,7 +161,7 @@ With --access-token, prints only the bare access token — suitable for
 command substitution into an Authorization header:
 
     curl https://api.anthropic.com/v1/messages \
-      -H "Authorization: Bearer $(ant auth print-credentials --access-token)" ...
+      -H "Authorization: Bearer $(ask auth print-credentials --access-token)" ...
 
 With --env, prints KEY=value lines (ANTHROPIC_AUTH_TOKEN, plus
 ANTHROPIC_BASE_URL when the profile sets one) for use as a .env file.`,
@@ -235,8 +235,8 @@ func authLogin(ctx context.Context, c *cli.Command) error {
 	if wantOrg != "" && strings.TrimSpace(c.Root().String("organization-id")) == "" {
 		fmt.Fprintf(os.Stderr,
 			"Using organization %s from profile %q.\n"+
-				"  To pick a different org by name, start a new profile: ant auth login --profile <name>\n"+
-				"  To retarget this profile:                             ant profile set organization_id <id>\n",
+				"  To pick a different org by name, start a new profile: ask auth login --profile <name>\n"+
+				"  To retarget this profile:                             ask profile set organization_id <id>\n",
 			wantOrg, profile)
 	}
 	buildAuthorizeURL := func(redirectURI string) string {
@@ -396,7 +396,7 @@ func authLogin(ctx context.Context, c *cli.Command) error {
 		fmt.Fprintf(os.Stderr,
 			"⚠  Authorized into organization %s (%s), but profile %q has organization_id=%s.\n"+
 				"   Console enforces the requested org, so this likely means the authorize URL was edited.\n"+
-				"   Run `ant profile set organization_id %s --profile %s` to retarget the profile, or re-login.\n",
+				"   Run `ask profile set organization_id %s --profile %s` to retarget the profile, or re-login.\n",
 			gotOrg, tok.Organization.Name, profile, wantOrg, gotOrg, profile)
 	}
 
@@ -448,7 +448,7 @@ func authLogin(ctx context.Context, c *cli.Command) error {
 	} else if prev != nil {
 		// Re-login never rewrites the profile config — creds record the
 		// ephemeral fact (what this token is bound to); config records
-		// durable intent set via `ant profile set`. When they diverge,
+		// durable intent set via `ask profile set`. When they diverge,
 		// surface it so the user can decide; `auth status` shows the
 		// drift until they act.
 		switch {
@@ -457,13 +457,13 @@ func authLogin(ctx context.Context, c *cli.Command) error {
 		case prev.WorkspaceID == "":
 			fmt.Fprintf(os.Stderr,
 				"→ Token bound to workspace %q (%s).\n"+
-					"  To make this the default for profile %q: ant profile set workspace_id %s --profile %s\n",
+					"  To make this the default for profile %q: ask profile set workspace_id %s --profile %s\n",
 				tok.Workspace.Name, effectiveWorkspaceID, profile, effectiveWorkspaceID, profile)
 		default:
 			fmt.Fprintf(os.Stderr,
 				"⚠ Token bound to workspace %q (%s), but profile %q targets %s.\n"+
-					"  To retarget this profile:      ant profile set workspace_id %s --profile %s\n"+
-					"  Or create a separate profile:  ant auth login --profile <new> --workspace-id %s\n",
+					"  To retarget this profile:      ask profile set workspace_id %s --profile %s\n"+
+					"  Or create a separate profile:  ask auth login --profile <new> --workspace-id %s\n",
 				tok.Workspace.Name, effectiveWorkspaceID, profile, prev.WorkspaceID,
 				effectiveWorkspaceID, profile, effectiveWorkspaceID)
 		}
@@ -546,8 +546,8 @@ func authLogout(ctx context.Context, c *cli.Command) error {
 	// workspace_id, base_url, auth block) is durable, user- or MDM-provisioned
 	// intent and survives logout untouched — re-login reuses it instead of
 	// re-prompting. To switch org without editing the profile, pass
-	// `ant auth login --organization-id <id>`; to change the profile's binding,
-	// use `ant profile set organization_id <id>`.
+	// `ask auth login --organization-id <id>`; to change the profile's binding,
+	// use `ask profile set organization_id <id>`.
 	path := config.ProfileCredentialsPath(dir, profile)
 	if err := os.Remove(path); err != nil {
 		if os.IsNotExist(err) {
@@ -671,15 +671,15 @@ func authStatus(ctx context.Context, c *cli.Command) error {
 	}
 	switch {
 	case credWinner == 0 && cfgErr != nil && errors.Is(cfgErr, os.ErrNotExist):
-		fmt.Fprintf(out, "  (profile %q not configured — run `ant auth login` to set it up)\n", profile)
+		fmt.Fprintf(out, "  (profile %q not configured — run `ask auth login` to set it up)\n", profile)
 	case credWinner == 0 && cfgErr != nil:
 		fmt.Fprintf(out, "  (profile config unreadable: %v)\n", cfgErr)
 	case credWinner == 0 && cfgErr == nil && cfg != nil && credsErr != nil && os.IsNotExist(credsErr):
-		fmt.Fprintf(out, "  (profile %q configured but not logged in — run `ant auth login`)\n", profile)
+		fmt.Fprintf(out, "  (profile %q configured but not logged in — run `ask auth login`)\n", profile)
 	case credWinner == 0 && cfgErr == nil && cfg != nil && credsErr != nil:
 		fmt.Fprintf(out, "  (credentials unreadable: %v)\n", credsErr)
 	case credWinner == 0:
-		fmt.Fprintln(out, "  (no credential configured — set ANTHROPIC_API_KEY or run `ant auth login`)")
+		fmt.Fprintln(out, "  (no credential configured — set ANTHROPIC_API_KEY or run `ask auth login`)")
 	}
 	if apiKeySet {
 		writeRow(out, credWinner == 1, "--api-key / ANTHROPIC_API_KEY", formatSecret(root.String("api-key"), true))
@@ -737,7 +737,7 @@ func authStatus(ctx context.Context, c *cli.Command) error {
 		writeRow(out, false, "Federation (jwt-bearer)", "partial — missing required inputs")
 	}
 
-	// Surface the surprising-override case: the user ran `ant auth login` but
+	// Surface the surprising-override case: the user ran `ask auth login` but
 	// has a credential env var set that silently beats the profile on every
 	// request.
 	if profileTokenPresent && (apiKeySet || authTokenSet) {
@@ -1002,7 +1002,7 @@ func authPrintCredentials(ctx context.Context, c *cli.Command) error {
 		switch {
 		case creds.RefreshToken == "":
 			fmt.Fprintf(os.Stderr,
-				"warning: token for profile %q %s and no refresh_token is stored; run `ant auth login`\n",
+				"warning: token for profile %q %s and no refresh_token is stored; run `ask auth login`\n",
 				profile, expiry)
 		default:
 			baseURL := resolveBaseURL("", cfg)
@@ -1012,7 +1012,7 @@ func authPrintCredentials(ctx context.Context, c *cli.Command) error {
 				// Warn-and-proceed rather than error: the on-disk token may
 				// still have a few seconds of validity (we refresh at the 120s
 				// advisory threshold, not at hard expiry), and a transient 5xx
-				// shouldn't turn $(ant auth print-credentials --access-token)
+				// shouldn't turn $(ask auth print-credentials --access-token)
 				// into an empty interpolation when a working token exists.
 				fmt.Fprintf(os.Stderr,
 					"warning: token for profile %q %s and refresh failed: %v\n",
@@ -1289,7 +1289,7 @@ func resolveWorkspaceID(flag string, prev *config.Config) string {
 // explicit --organization-id / ANTHROPIC_ORGANIZATION_ID wins so a user can
 // re-target a login without Console's switcher, else the profile's stored
 // organization_id. A return of "" sends no hint, so Console shows the org
-// picker — which is what a fresh login gets after `ant auth logout` clears the
+// picker — which is what a fresh login gets after `ask auth logout` clears the
 // cached org. Note an explicit empty flag falls through to the stored org;
 // "no hint" is the absence of both, not `--organization-id ""`.
 func resolveLoginOrg(flag string, prev *config.Config) string {
@@ -1380,7 +1380,7 @@ func writeCallbackPage(w http.ResponseWriter, status int, heading, body string) 
 	fmt.Fprintf(w, `<html><body style="font-family:system-ui;text-align:center;padding:4em"><h2>%s</h2><p>%s</p></body></html>`, h, b)
 }
 
-// loginModeEnum tags the three operational modes of `ant auth login`. Mode
+// loginModeEnum tags the three operational modes of `ask auth login`. Mode
 // is derived from the (--no-browser, --callback-port) flag combination so
 // the dispatch logic is in one place and testable without end-to-end setup.
 type loginModeEnum int

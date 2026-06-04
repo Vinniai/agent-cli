@@ -56,7 +56,7 @@ func TestProfileActivate(t *testing.T) {
 		err := run(t, profileCmd(), "profile", "activate", "nope")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `profile "nope" doesn't exist`)
-		assert.Contains(t, err.Error(), "ant auth login --profile nope")
+		assert.Contains(t, err.Error(), "ask auth login --profile nope")
 		// Must not have clobbered active_config on a failed activate.
 		assert.Equal(t, "work", strings.TrimSpace(string(mustRead(t, config.ActiveConfigPath(dir)))))
 	})

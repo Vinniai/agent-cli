@@ -166,7 +166,7 @@ func warnIfMultipleAuthSources(apiKey, authToken, profileExplicit, federation, p
 	}
 	multiAuthWarnOnce.Do(func() {
 		fmt.Fprintf(os.Stderr,
-			"Note: multiple auth sources configured (%s); using %s per precedence. Run `ant auth status` for details.\n",
+			"Note: multiple auth sources configured (%s); using %s per precedence. Run `ask auth status` for details.\n",
 			strings.Join(on, ", "), on[0])
 	})
 }
@@ -186,7 +186,7 @@ func profileIsExplicit(cmd *cli.Command) bool {
 
 // loadProfileIfUsable returns the active profile config only when the
 // profile is actually usable — i.e. its credentials are present on disk
-// for user_oauth profiles. After `ant auth logout` the credentials file
+// for user_oauth profiles. After `ask auth logout` the credentials file
 // is deleted but `configs/<profile>.json` is intentionally preserved so
 // workspace_id/base_url survive a re-login; this check prevents that
 // stale config from claiming the profile tier of credential precedence
@@ -224,7 +224,7 @@ func loadProfileIfUsable(cmd *cli.Command) (*config.Config, bool) {
 			cfg.AuthenticationInfo.UserOAuth.ClientID = oauthClientIDProd
 			clientIDDefaultedOnce.Do(func() {
 				fmt.Fprintln(os.Stderr,
-					"Note: profile is missing client_id; defaulting to ant-cli prod client. Run `ant auth login` to persist.")
+					"Note: profile is missing client_id; defaulting to ask-cli prod client. Run `ask auth login` to persist.")
 			})
 		}
 	}
