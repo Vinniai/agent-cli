@@ -76,6 +76,44 @@ func defaultCommandRunner(ctx context.Context, name string, args []string, env [
 // cheap for command translation; override per call with --model.
 const defaultModel = "claude-haiku-4-5-20251001"
 
+// modelLadder orders assistant models cheapest/fastest -> most capable. Auto-
+// routing starts at the chosen model and escalates up this ladder when a call
+// fails transiently or a task turns out to be deeply multi-step.
+var modelLadder = []string{
+	"claude-haiku-4-5-20251001",
+	"claude-sonnet-4-6",
+	"claude-opus-4-8",
+}
+
+// complexStepThreshold is how many tool steps a task may take at one model
+// before auto-routing bumps it to the next, more capable model.
+const complexStepThreshold = 3
+
+// nextModel returns the next more-capable model after cur, if cur is on the
+// ladder and not already at the top.
+func nextModel(cur string) (string, bool) {
+	for i, m := range modelLadder {
+		if m == cur && i+1 < len(modelLadder) {
+			return modelLadder[i+1], true
+		}
+	}
+	return cur, false
+}
+
+// retryableStatus reports the HTTP status of an API error and whether it is
+// worth retrying on a stronger model (rate limits, overload, transient 5xx).
+func retryableStatus(err error) (int, bool) {
+	var apiErr *anthropic.Error
+	if !errors.As(err, &apiErr) {
+		return 0, false
+	}
+	switch apiErr.StatusCode {
+	case 429, 500, 502, 503, 529:
+		return apiErr.StatusCode, true
+	}
+	return apiErr.StatusCode, false
+}
+
 // runToolName is the name of the single tool exposed to the model.
 const runToolName = "run_command"
 
@@ -109,6 +147,9 @@ type agentLoop struct {
 	forceContexts bool
 	// yes bypasses the write-confirmation gate.
 	yes bool
+	// escalate enables auto-routing up modelLadder on transient failures and
+	// deeply multi-step tasks.
+	escalate bool
 }
 
 // runTool defines the single run_command tool exposed to the model.
@@ -258,6 +299,7 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
 	}
 	tools := runTool()
+	steps := 0 // tool steps taken at the current model (drives complexity routing)
 
 	for {
 		params := anthropic.MessageNewParams{
@@ -269,6 +311,17 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		}
 		resp, err := a.message(ctx, params)
 		if err != nil {
+			// Auto-route: on a transient failure, retry the same step on the
+			// next, more capable model before giving up.
+			if a.escalate {
+				if code, ok := retryableStatus(err); ok {
+					if nm, up := nextModel(model); up {
+						fmt.Fprintf(a.stderr, "↑ %s failed (HTTP %d); routing to %s and retrying\n", model, code, nm)
+						model, steps = nm, 0
+						continue
+					}
+				}
+			}
 			if hint := authHint(err); hint != "" {
 				fmt.Fprint(a.stderr, hint)
 			}
@@ -303,6 +356,16 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 			return nil
 		}
 		msgs = append(msgs, anthropic.NewUserMessage(toolResults...))
+
+		// Auto-route: a task still looping after several steps is complex enough
+		// to warrant a stronger model for the remaining steps.
+		steps++
+		if a.escalate && steps >= complexStepThreshold {
+			if nm, up := nextModel(model); up {
+				fmt.Fprintf(a.stderr, "↑ multi-step task (%d steps); routing %s -> %s\n", steps, model, nm)
+				model, steps = nm, 0
+			}
+		}
 	}
 }
 
@@ -362,6 +425,7 @@ The executed command and its output go to stderr; the final answer to stdout.
 			&cli.StringFlag{Name: "profile", Usage: "Pin one account/profile (authoritative; overrides any inferred target)"},
 			&cli.BoolFlag{Name: "all-profiles", Usage: "Fan the question out across every profile/host"},
 			&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Skip the write-confirmation gate (run writes without asking)"},
+			&cli.BoolFlag{Name: "no-escalate", Usage: "Disable auto-routing to a stronger model on transient errors or deeply multi-step tasks"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			client := anthropic.NewClient(getDefaultRequestOptions(cmd.Root())...)
@@ -399,6 +463,7 @@ The executed command and its output go to stderr; the final answer to stdout.
 				available:     available,
 				forceContexts: force,
 				yes:           cmd.Bool("yes"),
+				escalate:      !cmd.Bool("no-escalate"),
 			}
 
 			args := cmd.Args().Slice()
