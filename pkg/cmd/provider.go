@@ -150,6 +150,9 @@ type agentLoop struct {
 	// escalate enables auto-routing up modelLadder on transient failures and
 	// deeply multi-step tasks.
 	escalate bool
+	// history carries the running conversation across run() calls so REPL
+	// follow-ups can reference earlier turns ("what's in it", "its policy").
+	history []anthropic.MessageParam
 }
 
 // runTool defines the single run_command tool exposed to the model.
@@ -295,9 +298,9 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		model = defaultModel
 	}
 
-	msgs := []anthropic.MessageParam{
-		anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
-	}
+	// Seed from prior turns so REPL follow-ups keep context, then add this prompt.
+	msgs := append([]anthropic.MessageParam{}, a.history...)
+	msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)))
 	tools := runTool()
 	steps := 0 // tool steps taken at the current model (drives complexity routing)
 
@@ -350,9 +353,11 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		msgs = append(msgs, resp.ToParam())
 
 		if resp.StopReason != anthropic.StopReasonToolUse {
+			a.history = msgs
 			return nil
 		}
 		if len(toolResults) == 0 {
+			a.history = msgs
 			return nil
 		}
 		msgs = append(msgs, anthropic.NewUserMessage(toolResults...))

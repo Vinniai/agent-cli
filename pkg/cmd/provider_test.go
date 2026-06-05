@@ -538,3 +538,47 @@ func TestAgentLoopEscalatesOnMultiStep(t *testing.T) {
 		t.Fatalf("want final step routed to sonnet after %d steps, got models=%v", complexStepThreshold, models)
 	}
 }
+
+// --- REPL conversation memory ------------------------------------------------
+
+// TestAgentLoopCarriesHistory verifies a second run() sees the prior turn, so
+// follow-ups like "what's in it" resolve against earlier context.
+func TestAgentLoopCarriesHistory(t *testing.T) {
+	runner := &recordingRunner{out: `{"Buckets":[{"Name":"demo"}]}`}
+	var seenSecondTurn int // messages the model received on the 2nd prompt
+	var i int
+	msg := func(ctx context.Context, params anthropic.MessageNewParams) (*anthropic.Message, error) {
+		switch i {
+		case 0: // turn 1: "what buckets" -> tool
+			i++
+			return toolUseMessage(t, "a", runCommandInput{Args: []string{"s3api", "list-buckets"}}), nil
+		case 1: // turn 1: summary
+			i++
+			return textMessage(t, "You have: demo."), nil
+		default: // turn 2: capture how many messages were carried in
+			seenSecondTurn = len(params.Messages)
+			i++
+			return textMessage(t, "demo contains 3 objects."), nil
+		}
+	}
+	loop := &agentLoop{
+		provider: awsProvider{},
+		model:    defaultModel,
+		runner:   runner.run,
+		message:  msg,
+		stdin:    strings.NewReader(""),
+		stdout:   &bytes.Buffer{},
+		stderr:   &bytes.Buffer{},
+	}
+	if err := loop.run(context.Background(), "what buckets do I have"); err != nil {
+		t.Fatalf("turn1: %v", err)
+	}
+	if err := loop.run(context.Background(), "what's in it"); err != nil {
+		t.Fatalf("turn2: %v", err)
+	}
+	// Turn 2 should carry turn 1's exchange (user+assistant+toolresult+assistant)
+	// plus the new prompt — i.e. well more than a single message.
+	if seenSecondTurn < 4 {
+		t.Fatalf("turn2 saw %d messages; expected prior turn carried as context", seenSecondTurn)
+	}
+}
