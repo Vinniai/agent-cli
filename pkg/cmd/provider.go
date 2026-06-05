@@ -153,6 +153,9 @@ type agentLoop struct {
 	// history carries the running conversation across run() calls so REPL
 	// follow-ups can reference earlier turns ("what's in it", "its policy").
 	history []anthropic.MessageParam
+	// lastAnswer holds the model's final text from the most recent run(), used
+	// to persist the turn for cross-invocation session continuity.
+	lastAnswer string
 }
 
 // runTool defines the single run_command tool exposed to the model.
@@ -332,11 +335,13 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		}
 
 		var toolResults []anthropic.ContentBlockParamUnion
+		var turnText strings.Builder
 		for _, block := range resp.Content {
 			switch b := block.AsAny().(type) {
 			case anthropic.TextBlock:
 				if b.Text != "" {
 					fmt.Fprintln(a.stdout, b.Text)
+					turnText.WriteString(b.Text)
 				}
 			case anthropic.ToolUseBlock:
 				var in runCommandInput
@@ -353,10 +358,12 @@ func (a *agentLoop) run(ctx context.Context, prompt string) error {
 		msgs = append(msgs, resp.ToParam())
 
 		if resp.StopReason != anthropic.StopReasonToolUse {
+			a.lastAnswer = turnText.String()
 			a.history = msgs
 			return nil
 		}
 		if len(toolResults) == 0 {
+			a.lastAnswer = turnText.String()
 			a.history = msgs
 			return nil
 		}
@@ -431,6 +438,7 @@ The executed command and its output go to stderr; the final answer to stdout.
 			&cli.BoolFlag{Name: "all-profiles", Usage: "Fan the question out across every profile/host"},
 			&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Skip the write-confirmation gate (run writes without asking)"},
 			&cli.BoolFlag{Name: "no-escalate", Usage: "Disable auto-routing to a stronger model on transient errors or deeply multi-step tasks"},
+			&cli.BoolFlag{Name: "new", Usage: "Start a fresh conversation (ignore the chained session from earlier commands)"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			client := anthropic.NewClient(getDefaultRequestOptions(cmd.Root())...)
@@ -473,7 +481,19 @@ The executed command and its output go to stderr; the final answer to stdout.
 
 			args := cmd.Args().Slice()
 			if len(args) > 0 {
-				return loop.run(ctx, strings.Join(args, " "))
+				prompt := strings.Join(args, " ")
+				// Chain onto the recent conversation in this shell so follow-ups
+				// keep context across separate `ask` commands. --new resets it.
+				if cmd.Bool("new") {
+					clearSession(p.Name())
+				}
+				turns := loadSessionTurns(p.Name())
+				loop.history = historyFromTurns(turns)
+				err := loop.run(ctx, prompt)
+				if err == nil {
+					saveSessionTurns(p.Name(), append(turns, sessionTurn{User: prompt, Assistant: loop.lastAnswer}))
+				}
+				return err
 			}
 			if isInputPiped() {
 				data, err := io.ReadAll(os.Stdin)
