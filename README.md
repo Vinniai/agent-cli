@@ -45,6 +45,18 @@ export ANTHROPIC_API_KEY=sk-ant-...      # the model that does the translation
 
 Run a provider with no prompt to drop into an interactive REPL: `./ask aws`.
 
+**Conversations chain.** Consecutive `ask` commands in the same shell continue
+one conversation, so follow-ups resolve against earlier turns:
+
+```sh
+ask aws "what buckets do I have"   # -> 1. logs-bucket  2. data-bucket
+ask aws "what's in 1"              # "1" -> logs-bucket
+ask aws "and its policy?"          # "its" -> logs-bucket
+ask aws --new "..."                # start a fresh conversation
+```
+
+Sessions are per-terminal and expire after 30 min idle.
+
 **Quote your prompt** when it contains characters your shell treats specially
 (`?`, `'`, `|`, `*`). Plain words work unquoted (`ask aws list my buckets`), but
 `ask aws how many buckets?` makes the shell try to glob `buckets?` — so quoting

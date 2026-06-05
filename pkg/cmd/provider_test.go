@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -580,5 +581,46 @@ func TestAgentLoopCarriesHistory(t *testing.T) {
 	// plus the new prompt — i.e. well more than a single message.
 	if seenSecondTurn < 4 {
 		t.Fatalf("turn2 saw %d messages; expected prior turn carried as context", seenSecondTurn)
+	}
+}
+
+// --- cross-invocation session persistence ------------------------------------
+
+func TestSessionRoundTrip(t *testing.T) {
+	const prov = "unittest-sess"
+	clearSession(prov)
+	t.Cleanup(func() { clearSession(prov) })
+
+	if got := loadSessionTurns(prov); got != nil {
+		t.Fatalf("expected no session initially, got %v", got)
+	}
+	turns := []sessionTurn{{User: "what buckets", Assistant: "1. a  2. b"}, {User: "whats in 1", Assistant: "a is empty"}}
+	saveSessionTurns(prov, turns)
+
+	got := loadSessionTurns(prov)
+	if len(got) != 2 || got[1].User != "whats in 1" {
+		t.Fatalf("round-trip mismatch: %v", got)
+	}
+	if h := historyFromTurns(turns); len(h) != 4 {
+		t.Fatalf("want 4 messages from 2 turns, got %d", len(h))
+	}
+}
+
+func TestSessionCapsTurns(t *testing.T) {
+	const prov = "unittest-cap"
+	t.Cleanup(func() { clearSession(prov) })
+
+	var turns []sessionTurn
+	for i := 0; i < sessionMaxTurns+5; i++ {
+		turns = append(turns, sessionTurn{User: fmt.Sprintf("u%d", i), Assistant: "x"})
+	}
+	saveSessionTurns(prov, turns)
+
+	got := loadSessionTurns(prov)
+	if len(got) != sessionMaxTurns {
+		t.Fatalf("want capped to %d, got %d", sessionMaxTurns, len(got))
+	}
+	if got[0].User != fmt.Sprintf("u%d", 5) {
+		t.Fatalf("want oldest dropped (u5 first), got %s", got[0].User)
 	}
 }
