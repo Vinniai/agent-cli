@@ -434,3 +434,107 @@ func TestAuthHint(t *testing.T) {
 		})
 	}
 }
+
+// --- auto-routing / model escalation -----------------------------------------
+
+// modelRecorder is a messageFunc that records the model on each call and returns
+// scripted (error-or-message) responses in order.
+func modelRecorder(t *testing.T, models *[]string, steps ...func() (*anthropic.Message, error)) messageFunc {
+	t.Helper()
+	var i int
+	return func(ctx context.Context, params anthropic.MessageNewParams) (*anthropic.Message, error) {
+		*models = append(*models, string(params.Model))
+		if i >= len(steps) {
+			t.Fatalf("messageFunc called more times than scripted (%d)", len(steps))
+		}
+		s := steps[i]
+		i++
+		return s()
+	}
+}
+
+func toolStep(t *testing.T, id string, args ...string) func() (*anthropic.Message, error) {
+	return func() (*anthropic.Message, error) {
+		return toolUseMessage(t, id, runCommandInput{Args: args}), nil
+	}
+}
+func textStep(t *testing.T, s string) func() (*anthropic.Message, error) {
+	return func() (*anthropic.Message, error) { return textMessage(t, s), nil }
+}
+func errStep(status int) func() (*anthropic.Message, error) {
+	return func() (*anthropic.Message, error) { return nil, &anthropic.Error{StatusCode: status} }
+}
+
+func TestAgentLoopEscalatesOnRateLimit(t *testing.T) {
+	runner := &recordingRunner{out: `{"Buckets":[]}`}
+	var models []string
+	loop := &agentLoop{
+		provider: awsProvider{},
+		model:    defaultModel,
+		escalate: true,
+		runner:   runner.run,
+		message: modelRecorder(t, &models,
+			errStep(429), // haiku -> rate limited
+			toolStep(t, "t1", "s3api", "list-buckets"),
+			textStep(t, "done"),
+		),
+		stdin:  strings.NewReader(""),
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+	if err := loop.run(context.Background(), "list buckets"); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(models) < 2 || models[0] != "claude-haiku-4-5-20251001" || models[1] != "claude-sonnet-4-6" {
+		t.Fatalf("want escalation haiku->sonnet, got %v", models)
+	}
+}
+
+func TestAgentLoopNoEscalateReturnsError(t *testing.T) {
+	var models []string
+	loop := &agentLoop{
+		provider: awsProvider{},
+		model:    defaultModel,
+		escalate: false, // opt-out
+		runner:   (&recordingRunner{}).run,
+		message:  modelRecorder(t, &models, errStep(429)),
+		stdin:    strings.NewReader(""),
+		stdout:   &bytes.Buffer{},
+		stderr:   &bytes.Buffer{},
+	}
+	if err := loop.run(context.Background(), "x"); err == nil {
+		t.Fatal("want error when escalation disabled, got nil")
+	}
+	if len(models) != 1 {
+		t.Fatalf("want a single attempt (no retry), got %v", models)
+	}
+}
+
+func TestAgentLoopEscalatesOnMultiStep(t *testing.T) {
+	runner := &recordingRunner{out: `ok`}
+	var models []string
+	// Three tool steps then a final answer: after complexStepThreshold steps the
+	// model should route haiku -> sonnet for the remaining call.
+	loop := &agentLoop{
+		provider: awsProvider{},
+		model:    defaultModel,
+		escalate: true,
+		runner:   runner.run,
+		message: modelRecorder(t, &models,
+			toolStep(t, "s1", "s3api", "list-buckets"),
+			toolStep(t, "s2", "s3api", "list-buckets"),
+			toolStep(t, "s3", "s3api", "list-buckets"),
+			textStep(t, "done"),
+		),
+		stdin:  strings.NewReader(""),
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+	if err := loop.run(context.Background(), "complex"); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	last := models[len(models)-1]
+	if last != "claude-sonnet-4-6" {
+		t.Fatalf("want final step routed to sonnet after %d steps, got models=%v", complexStepThreshold, models)
+	}
+}
