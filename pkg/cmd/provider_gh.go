@@ -164,6 +164,10 @@ func (ghProvider) ContextEnv(c AccountContext) []string {
 	return nil
 }
 
+// DefaultContext is unused by gh: the gh CLI already honors GH_HOST itself and
+// defaults to github.com, so there is no env-derived target to inject.
+func (ghProvider) DefaultContext() (AccountContext, bool) { return AccountContext{}, false }
+
 // ghConfigDir resolves gh's config dir, honoring GH_CONFIG_DIR.
 func ghConfigDir() string {
 	if d := os.Getenv("GH_CONFIG_DIR"); d != "" {
