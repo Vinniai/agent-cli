@@ -87,8 +87,10 @@ emulator sandbox you can exercise without real cloud credentials.
   and its output go to stderr; the final answer goes to stdout (so it stays
   pipeable).
 - **Account selection:** `--profile <name>` pins one account, `--all-profiles`
-  fans out across all of them, or—with neither flag—the target is inferred from
-  your wording (e.g. "buckets in prod").
+  fans out across all of them, `AWS_PROFILE` (or `AWS_DEFAULT_PROFILE`) in the
+  environment sets a default target, or—with none of those—the target is inferred
+  from your wording (e.g. "buckets in prod"). So `export AWS_PROFILE=core-devops`
+  once and `ask aws "..."` just works without `--profile`.
 
 ### Adding a provider
 

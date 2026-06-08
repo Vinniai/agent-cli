@@ -51,6 +51,10 @@ type Provider interface {
 	// whichever mechanism its CLI supports; the other returns nil.
 	ContextArgs(c AccountContext) []string
 	ContextEnv(c AccountContext) []string
+	// DefaultContext returns a target derived from the environment (e.g. AWS's
+	// AWS_PROFILE) to use when the user passes no --profile/--all-profiles flag
+	// and the model infers none. Returns false when there is no env default.
+	DefaultContext() (AccountContext, bool)
 }
 
 // commandRunner is the seam used to execute the provider binary. Tests inject a
@@ -457,6 +461,13 @@ The executed command and its output go to stderr; the final answer to stdout.
 				profile := cmd.String("profile")
 				contexts = []AccountContext{{ID: profile, Label: profile, Source: "profile"}}
 				force = true
+			default:
+				// No flag: fall back to an env default (e.g. AWS_PROFILE) so the
+				// user need not pass --profile. Non-forced, so the model can still
+				// infer a different account from the wording.
+				if dc, ok := p.DefaultContext(); ok {
+					contexts = []AccountContext{dc}
+				}
 			}
 
 			available := all

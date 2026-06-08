@@ -201,6 +201,17 @@ func (awsProvider) ContextArgs(c AccountContext) []string {
 // ContextEnv is unused by AWS (it targets accounts via --profile args).
 func (awsProvider) ContextEnv(c AccountContext) []string { return nil }
 
+// DefaultContext targets the profile named by AWS_PROFILE / AWS_DEFAULT_PROFILE
+// so `ask aws "..."` works without an explicit --profile when one is exported.
+func (awsProvider) DefaultContext() (AccountContext, bool) {
+	for _, k := range []string{"AWS_PROFILE", "AWS_DEFAULT_PROFILE"} {
+		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+			return AccountContext{ID: v, Label: v, Source: k}, true
+		}
+	}
+	return AccountContext{}, false
+}
+
 // awsConfigDir resolves ~/.aws (kept for the production EnumerateContexts path).
 func awsConfigDir() string {
 	home, err := os.UserHomeDir()

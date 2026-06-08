@@ -624,3 +624,59 @@ func TestSessionCapsTurns(t *testing.T) {
 		t.Fatalf("want oldest dropped (u5 first), got %s", got[0].User)
 	}
 }
+
+// --- default context from environment (AWS_PROFILE) ---------------------------
+
+func TestAWSDefaultContextFromEnv(t *testing.T) {
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
+	t.Setenv("AWS_PROFILE", "core-devops")
+	dc, ok := awsProvider{}.DefaultContext()
+	if !ok || dc.ID != "core-devops" {
+		t.Fatalf("want core-devops default, got %+v ok=%v", dc, ok)
+	}
+	// AWS_DEFAULT_PROFILE is the fallback key.
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "fallback-prof")
+	if dc, ok := (awsProvider{}).DefaultContext(); !ok || dc.ID != "fallback-prof" {
+		t.Fatalf("want fallback-prof, got %+v ok=%v", dc, ok)
+	}
+	// Neither set -> no default.
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
+	if _, ok := (awsProvider{}).DefaultContext(); ok {
+		t.Fatal("want no default when env unset")
+	}
+}
+
+func TestGHHasNoEnvDefaultContext(t *testing.T) {
+	if _, ok := (ghProvider{}).DefaultContext(); ok {
+		t.Fatal("gh should have no env default (gh honors GH_HOST itself)")
+	}
+}
+
+// TestAgentLoopUsesDefaultContext verifies a non-forced default context is used
+// as the execution target when the model infers no profile (mirrors AWS_PROFILE).
+func TestAgentLoopUsesDefaultContext(t *testing.T) {
+	runner := &recordingRunner{out: `ok`}
+	loop := &agentLoop{
+		provider:      awsProvider{},
+		model:         defaultModel,
+		runner:        runner.run,
+		contexts:      []AccountContext{{ID: "core-devops", Label: "core-devops", Source: "AWS_PROFILE"}},
+		forceContexts: false, // default, not a hard pin
+		message: scriptedMessages(t,
+			toolUseMessage(t, "d1", runCommandInput{Args: []string{"s3", "ls"}}),
+			textMessage(t, "done"),
+		),
+		stdin:  strings.NewReader(""),
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+	if err := loop.run(context.Background(), "what buckets"); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	want := []string{"aws", "s3", "ls", "--profile", "core-devops"}
+	if len(runner.calls) != 1 || !reflect.DeepEqual(runner.calls[0], want) {
+		t.Fatalf("want default profile applied %v, got %v", want, runner.calls)
+	}
+}

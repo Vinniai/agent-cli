@@ -108,11 +108,14 @@ ANTHROPIC_CONFIG_DIR=/tmp/askoauth AWS_ENDPOINT_URL=http://localhost:4006 \
 grep '\[auth\]' /tmp/mock.log    # -> Bearer <token> ... anthropic-beta=oauth-2025-04-20
 ```
 
-### Account selection (three ways)
+### Account selection (four ways)
 1. **Pin one:** `--profile prod` (authoritative; the model can't override it).
 2. **All accounts:** `--all-profiles` (fans out across every profile in `~/.aws/config`).
-3. **Inferred from the question:** with neither flag, `ask` advertises your
-   available profiles to the model, which picks the matching one — e.g.
+3. **Default via env:** `export AWS_PROFILE=core-devops` (or `AWS_DEFAULT_PROFILE`)
+   → `ask aws "..."` targets it without `--profile`. It's a default, not a pin,
+   so the model can still infer a different account from the wording.
+4. **Inferred from the question:** with no flag or env default, `ask` advertises
+   your available profiles to the model, which picks the matching one — e.g.
    "buckets in **prod**" → runs with `--profile prod`; "in **every** account" →
    fans out. (Inference reads `~/.aws/config` profiles / `gh` `hosts.yml` hosts.)
 
