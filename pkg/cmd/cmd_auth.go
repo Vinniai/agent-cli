@@ -409,9 +409,16 @@ func authLogin(ctx context.Context, c *cli.Command) error {
 		effectiveWorkspaceID = workspaceID
 	}
 	if effectiveWorkspaceID == "" {
+		// The Console didn't bind a workspace (its picker was skipped). There's
+		// no API to list workspaces with this token, so prompt for the ID inline
+		// rather than aborting; it's stored on the profile and sent as the
+		// anthropic-workspace-id header on every request.
+		effectiveWorkspaceID = promptWorkspaceID()
+	}
+	if effectiveWorkspaceID == "" {
 		return fmt.Errorf("no workspace bound to the issued token. " +
-			"Pass --workspace-id, set workspace_id on the profile, " +
-			"or pick a workspace in the Console consent page.")
+			"Pass --workspace-id, set workspace_id on the profile (Console → " +
+			"Settings → Workspaces), or pick a workspace in the Console consent page.")
 	}
 
 	if bootstrapping {
@@ -1194,6 +1201,28 @@ func waitForCallback(ctx context.Context, listener net.Listener, wantState strin
 // the token exchange (not just the authorize redirect) as a bound CSRF
 // check across both legs — omitting it returns a 400 with
 // `oauth_request_parse_error`.
+// promptWorkspaceID asks the user to paste a workspace ID when the issued token
+// isn't bound to one. It reads from the controlling terminal (/dev/tty) so it
+// doesn't collide with the login flow's concurrent os.Stdin reader, and returns
+// "" when no terminal is available (e.g. CI) so the caller falls back to an error.
+func promptWorkspaceID() string {
+	tty, err := os.Open("/dev/tty")
+	if err != nil {
+		return ""
+	}
+	defer tty.Close()
+	return readWorkspaceID(os.Stderr, tty)
+}
+
+// readWorkspaceID prints the prompt and reads one line; split out for testing.
+func readWorkspaceID(out io.Writer, in io.Reader) string {
+	fmt.Fprint(out, "\nThe issued token isn't bound to a workspace (Console skipped the picker).\n"+
+		"Find your workspace ID under Console → Settings → Workspaces.\n"+
+		"Workspace ID (blank to cancel): ")
+	line, _ := bufio.NewReader(in).ReadString('\n')
+	return strings.TrimSpace(line)
+}
+
 func exchangeCode(ctx context.Context, baseURL, clientID, code, verifier, redirectURI, state string, debug bool) (*tokenResponse, error) {
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
