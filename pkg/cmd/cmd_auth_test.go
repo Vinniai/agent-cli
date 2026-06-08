@@ -1815,3 +1815,16 @@ func mustRead(t *testing.T, path string) []byte {
 	require.NoError(t, err)
 	return b
 }
+
+func TestReadWorkspaceID(t *testing.T) {
+	var out bytes.Buffer
+	if got := readWorkspaceID(&out, strings.NewReader("wrkspc_abc123\n")); got != "wrkspc_abc123" {
+		t.Fatalf("got %q, want wrkspc_abc123", got)
+	}
+	if !strings.Contains(out.String(), "Settings → Workspaces") {
+		t.Fatalf("prompt missing guidance: %q", out.String())
+	}
+	if got := readWorkspaceID(&bytes.Buffer{}, strings.NewReader("   \n")); got != "" {
+		t.Fatalf("blank input should return empty, got %q", got)
+	}
+}

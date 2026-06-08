@@ -103,7 +103,7 @@ line to the `Commands` list in `pkg/cmd/cmd.go`. Use `provider_aws.go` /
 `ask` needs credentials for the model (the brain) and for each CLI it drives.
 
 **Model (the brain)** — authenticate the model in one of two ways. Choose the
-model per call with `--model` (default `claude-sonnet-4-6`).
+model per call with `--model` (default `claude-haiku-4-5-20251001`).
 
 1. **OAuth (log in with your Claude account)** — no API key needed:
 
@@ -111,6 +111,10 @@ model per call with `--model` (default `claude-sonnet-4-6`).
    ./ask auth login          # opens a browser; grants the user:inference scope
    ./ask aws "list my S3 buckets"
    ```
+
+   If your account has workspaces and the Console doesn't bind one, login prompts
+   for a workspace ID (find it under Console → Settings → Workspaces) — or pass it
+   up front with `./ask auth login --workspace-id wrkspc_...`.
 
    The token is stored as a profile, auto-refreshed, and used by every command
    (including `aws`/`gh`). Manage logins with `./ask auth status` /
