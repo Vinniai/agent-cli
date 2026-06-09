@@ -7,10 +7,54 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 )
+
+// chooseBrain resolves the model backend. An explicit value (api/claude-cli)
+// wins; "auto" (the default) prefers a logged-in local claude CLI when no
+// API key/auth token is configured, else falls back to the API.
+func chooseBrain(brainFlag, apiKey, authToken string, claudeAvailable func() bool) string {
+	switch b := strings.ToLower(strings.TrimSpace(brainFlag)); b {
+	case "auto", "":
+		if apiKey != "" || authToken != "" {
+			return "api"
+		}
+		if claudeAvailable() {
+			return "claude-cli"
+		}
+		return "api"
+	default:
+		return b
+	}
+}
+
+// claudeCLIAvailable reports whether a logged-in `claude` CLI is usable as the
+// model backend: the binary is on PATH and a credential source exists (the
+// ~/.claude credentials file, or the macOS keychain item Claude Code uses).
+func claudeCLIAvailable() bool {
+	bin := os.Getenv("ASK_CLAUDE_BIN")
+	if bin == "" {
+		bin = "claude"
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		return false
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		if _, err := os.Stat(filepath.Join(home, ".claude", ".credentials.json")); err == nil {
+			return true
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		if exec.Command("security", "find-generic-password", "-s", "Claude Code-credentials").Run() == nil {
+			return true
+		}
+	}
+	return false
+}
 
 // The claude-cli brain drives the model through the local `claude` binary
 // (claude -p) instead of the Anthropic API — the OpenClaw "Claude CLI reuse"

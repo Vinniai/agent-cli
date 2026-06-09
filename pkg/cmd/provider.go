@@ -443,14 +443,14 @@ The executed command and its output go to stderr; the final answer to stdout.
 			&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Skip the write-confirmation gate (run writes without asking)"},
 			&cli.BoolFlag{Name: "no-escalate", Usage: "Disable auto-routing to a stronger model on transient errors or deeply multi-step tasks"},
 			&cli.BoolFlag{Name: "new", Usage: "Start a fresh conversation (ignore the chained session from earlier commands)"},
-			&cli.StringFlag{Name: "brain", Value: "api", Sources: cli.EnvVars("ASK_BRAIN"),
-				Usage: "Model backend: 'api' (Anthropic API) or 'claude-cli' (reuse the local `claude` login via claude -p, no API key)"},
+			&cli.StringFlag{Name: "brain", Value: "auto", Sources: cli.EnvVars("ASK_BRAIN"),
+				Usage: "Model backend: 'auto' (claude-cli if logged in & no API key, else api), 'api', or 'claude-cli'"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			// Pick the model backend: the Anthropic API, or the local `claude`
 			// CLI (OpenClaw-style reuse of an existing Claude login, no API key).
 			var message messageFunc
-			switch strings.ToLower(cmd.String("brain")) {
+			switch chooseBrain(cmd.String("brain"), cmd.Root().String("api-key"), cmd.Root().String("auth-token"), claudeCLIAvailable) {
 			case "claude-cli", "cli", "claude":
 				message = claudeCLIMessageFunc()
 			default:
