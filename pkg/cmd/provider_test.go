@@ -745,3 +745,28 @@ func TestDecisionToMessage(t *testing.T) {
 		t.Fatalf("answer decision should stop_reason=end_turn, got %q", m.StopReason)
 	}
 }
+
+// --- brain auto-detection ----------------------------------------------------
+
+func TestChooseBrain(t *testing.T) {
+	yes := func() bool { return true }
+	no := func() bool { return false }
+	cases := []struct {
+		name, flag, apiKey, authTok string
+		avail                       func() bool
+		want                        string
+	}{
+		{"explicit api", "api", "", "", yes, "api"},
+		{"explicit claude-cli wins over key", "claude-cli", "sk-ant", "", no, "claude-cli"},
+		{"auto + api key -> api", "auto", "sk-ant", "", yes, "api"},
+		{"auto + auth token -> api", "auto", "", "tok", yes, "api"},
+		{"auto + claude available -> claude-cli", "auto", "", "", yes, "claude-cli"},
+		{"auto + nothing -> api", "auto", "", "", no, "api"},
+		{"empty == auto", "", "", "", yes, "claude-cli"},
+	}
+	for _, c := range cases {
+		if got := chooseBrain(c.flag, c.apiKey, c.authTok, c.avail); got != c.want {
+			t.Fatalf("%s: chooseBrain=%q want %q", c.name, got, c.want)
+		}
+	}
+}
