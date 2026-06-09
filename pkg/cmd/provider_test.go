@@ -680,3 +680,68 @@ func TestAgentLoopUsesDefaultContext(t *testing.T) {
 		t.Fatalf("want default profile applied %v, got %v", want, runner.calls)
 	}
 }
+
+// --- claude-cli brain (OpenClaw-style local CLI reuse) -----------------------
+
+func TestModelToCLI(t *testing.T) {
+	cases := map[string]string{
+		"claude-haiku-4-5-20251001": "haiku",
+		"claude-opus-4-8":           "opus",
+		"claude-sonnet-4-6":         "sonnet",
+		"something-else":            "sonnet",
+	}
+	for in, want := range cases {
+		if got := modelToCLI(in); got != want {
+			t.Fatalf("modelToCLI(%q)=%q want %q", in, got, want)
+		}
+	}
+}
+
+func TestParseClaudeDecision(t *testing.T) {
+	// command decision on the final line
+	d := parseClaudeDecision("I'll list buckets.\n{\"args\":[\"s3\",\"ls\"]}")
+	if len(d.Args) != 2 || d.Args[0] != "s3" {
+		t.Fatalf("want args [s3 ls], got %+v", d)
+	}
+	// answer decision
+	d = parseClaudeDecision("blah\n{\"answer\":\"you have 2 buckets\"}")
+	if d.Answer != "you have 2 buckets" || len(d.Args) != 0 {
+		t.Fatalf("want answer, got %+v", d)
+	}
+	// profiles carried through
+	d = parseClaudeDecision(`{"args":["s3","ls"],"profiles":["prod"]}`)
+	if len(d.Profiles) != 1 || d.Profiles[0] != "prod" {
+		t.Fatalf("want profile prod, got %+v", d)
+	}
+	// no JSON -> whole output is the answer
+	d = parseClaudeDecision("just a plain answer")
+	if d.Answer != "just a plain answer" {
+		t.Fatalf("want plain answer fallback, got %+v", d)
+	}
+}
+
+func TestDecisionToMessage(t *testing.T) {
+	m, err := decisionToMessage("claude-haiku-4-5-20251001", claudeDecision{Args: []string{"s3", "ls"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.StopReason != anthropic.StopReasonToolUse {
+		t.Fatalf("args decision should stop_reason=tool_use, got %q", m.StopReason)
+	}
+	var sawTool bool
+	for _, b := range m.Content {
+		if tu, ok := b.AsAny().(anthropic.ToolUseBlock); ok && tu.Name == runToolName {
+			sawTool = true
+		}
+	}
+	if !sawTool {
+		t.Fatal("expected a run_command tool_use block")
+	}
+	m, err = decisionToMessage("claude-haiku-4-5-20251001", claudeDecision{Answer: "done"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.StopReason != anthropic.StopReasonEndTurn {
+		t.Fatalf("answer decision should stop_reason=end_turn, got %q", m.StopReason)
+	}
+}
