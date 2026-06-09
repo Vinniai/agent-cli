@@ -131,6 +131,20 @@ model per call with `--model` (default `claude-haiku-4-5-20251001`).
    Re-run `make claude-auth` if the token expires. Note: inference goes against
    your Claude subscription, so its rate limits apply (shared with Claude Code).
 
+   Already logged into the **Claude CLI** (`claude`) on this machine? Reuse that
+   login directly — no API key, OAuth profile, or workspace needed (the
+   OpenClaw-style "Claude CLI" backend):
+
+   ```sh
+   claude --version                      # ensure the claude CLI is installed + logged in
+   export ASK_BRAIN=claude-cli           # or per call: ask aws --brain claude-cli "..."
+   ./ask aws "list my S3 buckets"        # ask shells out to `claude -p` for the translation
+   ```
+
+   `ask` drives the local `claude` binary for the model step, so the Claude CLI's
+   own login handles auth. Override the binary with `ASK_CLAUDE_BIN`. (Must run on
+   the same host as the `claude` login.)
+
 2. **API key / auth token** — set one of these (or the matching flag):
 
    | Environment variable   | Notes                                            |

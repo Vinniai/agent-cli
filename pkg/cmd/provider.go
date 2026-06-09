@@ -443,9 +443,19 @@ The executed command and its output go to stderr; the final answer to stdout.
 			&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Skip the write-confirmation gate (run writes without asking)"},
 			&cli.BoolFlag{Name: "no-escalate", Usage: "Disable auto-routing to a stronger model on transient errors or deeply multi-step tasks"},
 			&cli.BoolFlag{Name: "new", Usage: "Start a fresh conversation (ignore the chained session from earlier commands)"},
+			&cli.StringFlag{Name: "brain", Value: "api", Sources: cli.EnvVars("ASK_BRAIN"),
+				Usage: "Model backend: 'api' (Anthropic API) or 'claude-cli' (reuse the local `claude` login via claude -p, no API key)"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			client := anthropic.NewClient(getDefaultRequestOptions(cmd.Root())...)
+			// Pick the model backend: the Anthropic API, or the local `claude`
+			// CLI (OpenClaw-style reuse of an existing Claude login, no API key).
+			var message messageFunc
+			switch strings.ToLower(cmd.String("brain")) {
+			case "claude-cli", "cli", "claude":
+				message = claudeCLIMessageFunc()
+			default:
+				message = defaultMessageFunc(anthropic.NewClient(getDefaultRequestOptions(cmd.Root())...))
+			}
 
 			// Always enumerate the available accounts (best-effort) so the model
 			// can INFER a target from the question. Explicit flags pin execution.
@@ -479,7 +489,7 @@ The executed command and its output go to stderr; the final answer to stdout.
 				provider:      p,
 				model:         cmd.String("model"),
 				runner:        defaultCommandRunner,
-				message:       defaultMessageFunc(client),
+				message:       message,
 				stdin:         os.Stdin,
 				stdout:        os.Stdout,
 				stderr:        os.Stderr,
